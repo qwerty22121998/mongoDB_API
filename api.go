@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/mgo.v2/bson"
-	"net/http"
 )
 
 const DB_NAME string = "school"
@@ -41,13 +40,13 @@ func insertStudent(collection *mgo.Collection, student Student) Request {
 
 	find := retrieveStudent(collection, student.ID)
 	if find.ID != "" {
-		return Request{http.StatusBadRequest, "Duplicated", nil}
+		return Request{400, "Duplicated", nil}
 	}
 	err := collection.Insert(student)
 	if err != nil {
-		return Request{http.StatusBadRequest, err.Error(), nil}
+		return Request{400, err.Error(), nil}
 	}
-	return Request{http.StatusOK, "Success", student}
+	return Request{200, "Success", student}
 }
 
 // retrieve
@@ -76,16 +75,16 @@ func updateStudent(collection *mgo.Collection, student Student) Request {
 	find := retrieveStudent(collection, student.ID)
 
 	if find.ID == "" {
-		return Request{http.StatusNotFound, "Not found", nil}
+		return Request{404, "Not found", nil}
 	}
 
 
 	err := collection.Update(bson.M{"id": student.ID}, student)
 	if err != nil {
 		fmt.Println(err)
-		return Request{http.StatusBadRequest, err.Error(), nil}
+		return Request{400, err.Error(), nil}
 	}
-	return Request{http.StatusOK, "Success", student}
+	return Request{200, "Success", student}
 }
 
 // delete
@@ -93,21 +92,21 @@ func deleteStudent(collection *mgo.Collection, id string) Request {
 	currentStudent := retrieveStudent(collection, id)
 
 	if currentStudent.ID == "" {
-		return Request{http.StatusNotFound, "Not found", nil}
+		return Request{404, "Not found", nil}
 	}
 
 	err := collection.Remove(bson.M{"id": id})
 	if err != nil {
-		return Request{http.StatusNotFound, err.Error(), nil}
+		return Request{404, err.Error(), nil}
 	}
-	return Request{http.StatusOK, "Success", currentStudent}
+	return Request{200, "Success", currentStudent}
 }
 func deleteAll(collection *mgo.Collection) Request {
 	change, err :=  collection.RemoveAll(bson.M{})
 	if err != nil {
-		return Request{http.StatusBadRequest, err.Error(), nil}
+		return Request{400, err.Error(), nil}
 	}
-	return Request{http.StatusOK, "Success", change}
+	return Request{200, "Success", change}
 }
 
 
@@ -118,7 +117,7 @@ func serverStart(collection *mgo.Collection) {
 		var currentStudent Student
 		err := context.BindJSON(&currentStudent)
 		if err != nil {
-			context.JSON(http.StatusBadRequest, Request{http.StatusBadRequest, "Bad request", nil})
+			context.JSON(400, Request{400, "Bad request", nil})
 			return
 		}
 		res := insertStudent(collection, currentStudent)
@@ -127,33 +126,39 @@ func serverStart(collection *mgo.Collection) {
 
 
 
+
+
 	route.GET("/student", func(context *gin.Context) {
 		students := retrieveAllStudent(collection)
 		if len(students) == 0 {
-			context.JSON(http.StatusNotFound, Request{http.StatusNotFound, "No data", nil})
+			context.JSON(404, Request{404, "No data", nil})
 			return
 		}
-		context.JSON(http.StatusOK, Request{http.StatusOK, "Success", students})
+		context.JSON(200, Request{200, "Success", students})
 	})
+
+
+
 	route.GET("/student/:id", func(context *gin.Context) {
 		id := context.Param("id")
 		currentStudent := retrieveStudent(collection, id)
 		if currentStudent.ID == "" {
-			context.JSON(http.StatusNotFound, Request{http.StatusNotFound, "Not found", nil})
+			context.JSON(404, Request{404, "Not found", nil})
 			return
 		}
-		context.JSON(http.StatusOK, Request{http.StatusOK, "Success", currentStudent})
+		context.JSON(200, Request{200, "Success", currentStudent})
 
 	})
 	route.PATCH("/update", func(context *gin.Context) {
 		var currentStudent Student
 		err := context.BindJSON(&currentStudent)
 		if err != nil {
-			context.JSON(http.StatusBadRequest, Request{http.StatusBadRequest, err.Error(), nil})
+			context.JSON(400, Request{400, err.Error(), nil})
 			return
 		}
 		resp := updateStudent(collection, currentStudent)
-		context.JSON(resp.Status, Request{resp.Status, resp.Msg, currentStudent})
+
+		context.JSON(resp.Status, Request{resp.Status, resp.Msg, resp.Data})
 
 	})
 	route.DELETE("/delete/:id", func(context *gin.Context) {

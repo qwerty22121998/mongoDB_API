@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"fmt"
 	"io/ioutil"
-	"github.com/gin-gonic/gin/json"
 	"strings"
+	"encoding/json"
 )
 
 const host = "http://localhost:8080"
@@ -25,52 +25,72 @@ type Test struct {
 	Type string
 	Link string
 	Req  interface{} // io.reader
-	Resp string
+	Resp Request
 }
 
 func TestApi(t *testing.T) {
 	client := &http.Client{}
-
-	// // clear db
-	req, err := http.NewRequest(http.MethodDelete, host+"/student", nil)
-
-	resp, err := client.Do(req)
-
-	if err != nil {
-		t.Errorf(err.Error())
-		return
-	}
-	fmt.Println(readResp(resp))
-
-	// insert
+	req, _ := http.NewRequest(http.MethodDelete, host+"/student", nil)
+	client.Do(req)
+	// ////
 	students := []Student{
-		Student{"1", "A", 15},
-		Student{"2", "B", 16},
-		Student{"3", "C", 17},
-		Student{"1", "A", 10},
+		{"1", "A", 15},
+		{"2", "B", 16},
+		{"3", "C", 17},
+		{"1", "A", 10},
+		{},
+		{"1", "Change", 10},
+		{},
+		{},
+		{"1", "Change", 11},
+	}
+	methods := []string{
+		"POST",
+		"POST",
+		"POST",
+		"POST",
+		"GET",
+		"PATCH",
+		"DELETE",
+		"DELETE",
+		"PATCH",
+	}
+	links := []string{
+		host + "/insert",
+		host + "/insert",
+		host + "/insert",
+		host + "/insert",
+		host + "/student",
+		host + "/update",
+		host + "/delete/4",
+		host + "/delete/1",
+		host + "/update",
+	}
+	rightResp := []Request{
+		{200, "Success", students[0]},
+		{200, "Success", students[1]},
+		{200, "Success", students[2]},
+		{400, "Duplicated", nil},
+		{200, "Success", []Student{students[0], students[1], students[2]}},
+		{200, "Success", students[5]},
+		{404, "Not found", nil},
+		{200, "Success", students[5]},
+		{404, "Not found", nil},
 	}
 
-	rightResp := []string{
-		"{\"Status\":200,\"Msg\":\"Success\",\"Data\":{\"ID\":\"1\",\"Name\":\"A\",\"Age\":15}}",
-		"{\"Status\":200,\"Msg\":\"Success\",\"Data\":{\"ID\":\"2\",\"Name\":\"B\",\"Age\":16}}",
-		"{\"Status\":200,\"Msg\":\"Success\",\"Data\":{\"ID\":\"3\",\"Name\":\"C\",\"Age\":17}}",
-		"{\"Status\":400,\"Msg\":\"Duplicated\",\"Data\":null}",
+
+
+	test := make([]Test, 0)
+	for i := range students {
+		test = append(test, Test{methods[i], links[i], students[i], rightResp[i]})
 	}
 
-	test := []Test{
-		Test{"POST", host + "/insert", students[0], rightResp[0]},
-		Test{"POST", host + "/insert", students[1], rightResp[1]},
-		Test{"POST", host + "/insert", students[2], rightResp[2]},
-		Test{"POST", host + "/insert", students[3], rightResp[3]},
-	}
+	// ////
 
 	for _, v := range test {
 		js, _ := json.Marshal(v.Req.(Student))
-
 		req, _ := http.NewRequest(v.Type, v.Link, strings.NewReader(string(js)))
-
 		fmt.Println(string(js))
-
 		res := ""
 		resp, err := client.Do(req)
 		if err != nil {
@@ -79,12 +99,12 @@ func TestApi(t *testing.T) {
 			res = readResp(resp)
 		}
 
-		fmt.Printf("Result\n%s\nExpected:\n%s\n", res, v.Resp)
-		if res != v.Resp {
+		expect, _ := json.Marshal(v.Resp)
+
+		fmt.Printf("Result\n%s\nExpected:\n%s\n\n", res, fmt.Sprintf("%v", string(expect)))
+		if res != fmt.Sprintf("%v", string(expect)) {
 			t.Errorf("Wrong case")
 			return
 		}
-
 	}
-
 }
